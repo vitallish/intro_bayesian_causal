@@ -18,19 +18,19 @@ parameters {
 }
 
 model {
-  
+
   // specify priors
-  
-  beta_w ~ normal(0, 1); 
-  beta_v ~ normal(0, 1); 
-  
+
+  beta_w ~ normal(0, 1);
+  beta_v ~ normal(0, 1);
+
   mu ~ normal(0, 1);
-  
+
   theta[1] ~ normal( mu, .5 );
-  
+
   theta[2:Pv] ~ normal( mu - theta[1], .5);
-  
-  // specify likelihood 
+
+  // specify likelihood
   for(i in 1:N){
     Y[i] ~ bernoulli_logit( W[i]*beta_w + V[i]*beta_v + ( V[i]*theta )*A[i] ) ;
   }
@@ -48,8 +48,11 @@ generated quantities {
   vector[N] overall_bb_weights;
   real overall_odds_ratio;
 
+  real overall_odds_ratio_nw;
+
   // cycle through strata of interest and compute causal Odds Ratio for each.
   vector[Pv] odds_ratio;
+  vector[Pv] odds_ratio_nw;
 
   for( v in 1:Pv ){
 
@@ -81,6 +84,10 @@ generated quantities {
     odds_1 = (marg_mean_y1/(1 - marg_mean_y1));
     odds_0 = (marg_mean_y0/(1 - marg_mean_y0));
     odds_ratio[v] = odds_1/odds_0;
+
+    odds_1 = mean(cond_mean_y1)/(1 - mean(cond_mean_y1));
+    odds_0 = mean(cond_mean_y0)/(1 - mean(cond_mean_y0));
+    odds_ratio_nw[v] = odds_1/odds_0;
   }
 
   for(i in 1:N){
@@ -94,5 +101,6 @@ generated quantities {
 
   // compute odds ratio
   overall_odds_ratio = (marg_mean_y1/(1 - marg_mean_y1)) / (marg_mean_y0/(1 - marg_mean_y0));
+  overall_odds_ratio_nw = (mean(overall_cond_mean_y1)/(1 - mean(overall_cond_mean_y1))) / (mean(overall_cond_mean_y0)/(1 - mean(overall_cond_mean_y0)));
 
 }
