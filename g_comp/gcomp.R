@@ -7,12 +7,13 @@
 library(rstan)
 library(LaplacesDemon)
 library(latex2exp)
+library(here)
 set.seed(1)
 
 
 ####------------------------ Simulate Data ---------------------------------####
 Nt = 10 # number of time points
-N = 100 # number of subjects 
+N = 1000 # number of subjects
 
 L = matrix(NA, ncol=Nt, nrow=N)
 A = matrix(NA, ncol=Nt, nrow=N)
@@ -26,13 +27,13 @@ beta_L_all = rev(c(-1,1,-.5,.5,-.25,.25, 0, 0, 1,0))
 
 for(t in 2:Nt){
   hist_idx = 1:(t-1)
-  
+
   beta_L = beta_L_all[hist_idx]
   theta =  -.5*(1 - 1/hist_idx)
-  
-  L[,t] = rnorm(N, mean = L[, hist_idx, drop=F] %*% beta_L + A[,hist_idx, drop=F] %*% theta, sd = 10)  
+
+  L[,t] = rnorm(N, mean = L[, hist_idx, drop=F] %*% beta_L + A[,hist_idx, drop=F] %*% theta, sd = 10)
   A[,t] = rbern(N, prob = invlogit(0 + A[,hist_idx, drop=F] %*% theta + L[,1:t, drop=F] %*% ( 1-1/(1:t) )  ) )
-  
+
 }
 
 Y = rnorm(N, A %*% rep(1, Nt) - L %*% rep(-1, Nt), 1 )
@@ -45,15 +46,15 @@ stidx = sapply(2:Nt, function(x) beta_len(x-1) + 1 )
 stidx[1] = 1
 
 ## create list of data to feed into Stan
-stan_data = list(Y=Y, A=A, L=L, st=stidx, ed=endidx, 
+stan_data = list(Y=Y, A=A, L=L, st=stidx, ed=endidx,
                  N=N, Nt=Nt, n_coeffs = max(endidx) )
 
 ####------------------------ Run Stan Model --------------------------------####
 
 
-gcomp_model = stan_model(file = "gcomp.stan")
+gcomp_model = stan_model(file = here("g_comp", "gcomp.stan"))
 
-stan_res = sampling(gcomp_model, data = stan_data, 
+stan_res = sampling(gcomp_model, data = stan_data,
                     control = list(max_treedepth = 10),
                     warmup = 1000, iter = 3000, chains=1, seed=1)
 
@@ -69,18 +70,18 @@ endidx[9]
 beta_draws_last = beta_draws[, 37:45]
 post_means = rev(colMeans(beta_draws_last))
 
-png("gcomp_sparse.png")
-plot(0:8, post_means, type='l', ylim=c(-2,2), 
-     ylab='Coefficient Value', axes=F, 
+png(here("g_comp", "gcomp_sparse.png"))
+plot(0:8, post_means, type='l', ylim=c(-2,2),
+     ylab='Coefficient Value', axes=F,
      xlab=TeX("Coefficients $\\beta_t$: effect of $L_t$ on $L_9$, for $t\\in 0,...8$ "))
-axis(side = 1, 
-     at = 0:8, 
+axis(side = 1,
+     at = 0:8,
      labels = c(TeX("$\\beta_8$"),TeX("$\\beta_7$"), TeX("$\\beta_6$"),
                 TeX("$\\beta_5$"), TeX("$\\beta_4$"), TeX("$\\beta_3$"),
                 TeX("$\\beta_2$"), TeX("$\\beta_1$"), TeX("$\\beta_0$"))  )
 axis(side = 2, at = seq(-2,2,.5), labels = seq(-2,2,.5))
 
-### Plot posterior credible Band 
+### Plot posterior credible Band
 colfunc <- colorRampPalette(c("white", "skyblue"))
 ci_perc = seq(.95,.05,-.01)
 colvec = colfunc(length(ci_perc))
@@ -99,12 +100,12 @@ tt=lm(L[,Nt]~ L[,1:(Nt-1)] + A[,1:(Nt-1)] )
 points(0:8, rev(tt$coefficients[2:10]), pch=20 )
 points(0:8, rev(beta_L_all[1:9]), col='red', pch=20)
 
-legend("topleft", 
+legend("topleft",
        legend = c('Posterior Mean/Credible Band', 'MLE', 'Truth'),
        col = c('steelblue', 'black', 'red'), lty=c(1,NA, NA), pch=c(20,20, 20), bty='n' )
 dev.off()
 
-png('gcomp_psi.png')
+png(here("g_comp", 'gcomp_psi.png'))
 hist( (mu1 - mu0 ), freq=F,
       xlab=TeX('Posterior Draws of $\\Psi$'), col='skyblue',
       main='', breaks=30)
